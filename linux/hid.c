@@ -662,12 +662,17 @@ int HID_API_EXPORT hid_get_report_descriptor(hid_device *dev, unsigned char *dat
     memset(&rpt_desc, 0x0, sizeof(rpt_desc));
     /* Get Report Descriptor Size */
     if (dev->device_handle > 0) {
-	if ((res = ioctl(dev->device_handle, HIDIOCGRDESCSIZE, &desc_size)) < 0)
-	    return res;
-	if (rpt_desc.size > length) {
+	int desc_size;
+	/* Get Report Descriptor Size */
+	if (ioctl(dev->device_handle, HIDIOCGRDESCSIZE, &desc_size) < 0)
+	    return -1;
+	if (desc_size > length) {
 	    errno = ERANGE;
 	    return -1;
 	}
+	rpt_desc.size = desc_size;
+	if (ioctl(dev->device_handle, HIDIOCGRDESC, &rpt_desc) < 0)
+	    return -1;
 	memcpy(data, rpt_desc.value, rpt_desc.size);
 	return rpt_desc.size;
     }
