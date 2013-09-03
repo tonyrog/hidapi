@@ -93,6 +93,9 @@ static int pthread_barrier_wait(pthread_barrier_t *barrier)
 
 static int return_data(hid_device *dev, unsigned char *data, size_t length);
 
+#define MAX_QUEUE_LEN 30
+
+/* FIXME: make array! */
 /* Linked List of input reports received from the device. */
 struct input_report {
 	uint8_t *data;
@@ -110,7 +113,9 @@ struct hid_device_ {
 	CFRunLoopSourceRef source;
 	uint8_t *input_report_buf;
 	CFIndex max_input_report_len;
+	int num_queued_reports;
 	struct input_report *input_reports;
+        struct input_report **last_input_report;
 
 	pthread_t thread;
 	pthread_mutex_t mutex; /* Protects input_reports */
@@ -118,7 +123,6 @@ struct hid_device_ {
 	pthread_barrier_t barrier; /* Ensures correct startup sequence */
 	pthread_barrier_t shutdown_barrier; /* Ensures correct shutdown sequence */
 	int shutdown_thread;
-        int event_sent;   /* 1 if event char was written on ichan[1] */
 
         int ichan[2];     /* thread write on 1 client poll on 0 */
 };
@@ -135,6 +139,8 @@ static hid_device *new_hid_device(void)
 	dev->source = NULL;
 	dev->input_report_buf = NULL;
 	dev->input_reports = NULL;
+	dev->last_input_report = &dev->input_reports;
+	dev->num_queued_reports = 0;
 	dev->shutdown_thread = 0;
 
 	/* Thread objects */
@@ -143,7 +149,6 @@ static hid_device *new_hid_device(void)
 	pthread_barrier_init(&dev->barrier, NULL, 2);
 	pthread_barrier_init(&dev->shutdown_barrier, NULL, 2);
 
-	dev->event_sent = 0;
 	/* fixme check error */
 	pipe(dev->ichan);
 	return dev;
@@ -586,35 +591,20 @@ static void hid_report_callback(void *context, IOReturn result, void *sender,
 	/* Lock this section */
 	pthread_mutex_lock(&dev->mutex);
 
-	/* Attach the new report object to the end of the list. */
-	if (dev->input_reports == NULL) {
-		/* The list is empty. Put it at the root. */
-		dev->input_reports = rpt;
-	}
+	*dev->last_input_report = rpt;
+	dev->last_input_report = &rpt;
+	dev->num_queued_reports++;
+
+	/* Pop one off if we've reached MAX_QUEUE_LEN in the queue. This
+	   way we don't grow forever if the user never reads
+	   anything from the device. */
+	if (dev->num_queued_reports > MAX_QUEUE_LEN)
+	    return_data(dev, NULL, 0);
 	else {
-		/* Find the end of the list and attach. */
-		struct input_report *cur = dev->input_reports;
-		int num_queued = 0;
-		while (cur->next != NULL) {
-			cur = cur->next;
-			num_queued++;
-		}
-		cur->next = rpt;
-
-		/* Pop one off if we've reached 30 in the queue. This
-		   way we don't grow forever if the user never reads
-		   anything from the device. */
-		if (num_queued > 30) {
-			return_data(dev, NULL, 0);
-		}
-	}
-
-	/* an client that poll on event handle may use this to poll for
-	 * new input data
-	 */
-	if (!dev->event_sent) {
+	    /* an client that poll on event handle may use this to poll for
+	     * new input data
+	     */
 	    write(dev->ichan[1], "!", 1);
-	    dev->event_sent = 1;
 	}
 
 	/* Signal a waiting thread that there is data. */
@@ -823,7 +813,15 @@ static int return_data(hid_device *dev, unsigned char *data, size_t length)
 	struct input_report *rpt = dev->input_reports;
 	size_t len = (length < rpt->len)? length: rpt->len;
 	memcpy(data, rpt->data, len);
-	dev->input_reports = rpt->next;
+	if (data && dev->num_queued_reports) {
+	    char buf[1];
+	    read(dev->ichan[0], buf, 1);  /* clear event */
+	    dev->num_queued_reports--;
+	}
+	if ((dev->input_reports = rpt->next) == NULL) { /* empty */
+	    // assert(num_queued_reports == 0);
+	    dev->last_input_report = &dev->input_reports;
+	}
 	free(rpt->data);
 	free(rpt);
 	return len;
@@ -939,11 +937,7 @@ int HID_API_EXPORT hid_read_timeout(hid_device *dev, unsigned char *data, size_t
 	}
 
 ret:
-	if (dev->event_sent) {
-	    char buf[1];
-	    read(dev->ichan[0], buf, 1);  /* clear event */
-	    dev->event_sent = 0;
-	}
+
 	/* Unlock */
 	pthread_mutex_unlock(&dev->mutex);
 	return bytes_read;
