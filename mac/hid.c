@@ -118,6 +118,9 @@ struct hid_device_ {
 	pthread_barrier_t barrier; /* Ensures correct startup sequence */
 	pthread_barrier_t shutdown_barrier; /* Ensures correct shutdown sequence */
 	int shutdown_thread;
+        int event_sent;   /* 1 if event char was written on ichan[1] */
+
+        int ichan[2];     /* thread write on 1 client poll on 0 */
 };
 
 static hid_device *new_hid_device(void)
@@ -140,6 +143,9 @@ static hid_device *new_hid_device(void)
 	pthread_barrier_init(&dev->barrier, NULL, 2);
 	pthread_barrier_init(&dev->shutdown_barrier, NULL, 2);
 
+	dev->event_sent = 0;
+	/* fixme check error */
+	pipe(dev->ichan);
 	return dev;
 }
 
@@ -171,6 +177,9 @@ static void free_hid_device(hid_device *dev)
 	pthread_barrier_destroy(&dev->barrier);
 	pthread_cond_destroy(&dev->condition);
 	pthread_mutex_destroy(&dev->mutex);
+
+	close(dev->ichan[1]);
+	close(dev->ichan[0]);
 
 	/* Free the structure itself. */
 	free(dev);
@@ -600,6 +609,14 @@ static void hid_report_callback(void *context, IOReturn result, void *sender,
 		}
 	}
 
+	/* an client that poll on event handle may use this to poll for
+	 * new input data
+	 */
+	if (!dev->event_sent) {
+	    write(dev->ichan[1], "!", 1);
+	    dev->event_sent = 1;
+	}
+
 	/* Signal a waiting thread that there is data. */
 	pthread_cond_signal(&dev->condition);
 
@@ -922,6 +939,11 @@ int HID_API_EXPORT hid_read_timeout(hid_device *dev, unsigned char *data, size_t
 	}
 
 ret:
+	if (dev->event_sent) {
+	    char buf[1];
+	    read(dev->ichan[0], buf, 1);  /* clear event */
+	    dev->event_sent = 0;
+	}
 	/* Unlock */
 	pthread_mutex_unlock(&dev->mutex);
 	return bytes_read;
@@ -939,6 +961,13 @@ int HID_API_EXPORT hid_set_nonblocking(hid_device *dev, int nonblock)
 
 	return 0;
 }
+
+// return an event handle that can be used for poll/epoll/select etc
+hid_handle_t HID_API_EXPORT hid_get_event_handle(hid_device *dev)
+{
+    return (hid_handle_t) ((intptr_t)dev->ichan[0]);
+}
+
 
 int HID_API_EXPORT hid_send_feature_report(hid_device *dev, const unsigned char *data, size_t length)
 {

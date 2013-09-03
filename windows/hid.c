@@ -731,6 +731,13 @@ int HID_API_EXPORT HID_API_CALL hid_set_nonblocking(hid_device *dev, int nonbloc
 	return 0; /* Success */
 }
 
+// return an event handle that can be used for poll/epoll/select etc
+hid_handle_t HID_API_EXPORT hid_get_event_handle(hid_device *dev)
+{
+    return (hid_handle_t) dev->ol.hEvent;
+}
+
+
 int HID_API_EXPORT HID_API_CALL hid_send_feature_report(hid_device *dev, const unsigned char *data, size_t length)
 {
 	BOOL res = HidD_SetFeature(dev->device_handle, (PVOID)data, length);

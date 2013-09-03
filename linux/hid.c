@@ -619,6 +619,7 @@ hid_device * HID_API_EXPORT hid_open_path(const char *path)
 	dev->device_handle = open(path, O_RDWR);
 
 	/* If we have a good handle, return it. */
+	/* test test shoud be >= 0 even if it is not so likely (I guess) */
 	if (dev->device_handle > 0) {
 
 		/* Get the report descriptor */
@@ -723,6 +724,12 @@ int HID_API_EXPORT hid_set_nonblocking(hid_device *dev, int nonblock)
 
 	dev->blocking = !nonblock;
 	return 0; /* Success */
+}
+
+// return an event handle that can be used for poll/epoll/select etc
+hid_handle_t HID_API_EXPORT hid_get_event_handle(hid_device *dev)
+{
+    return (hid_handle_t) ((intptr_t)dev->device_handle);
 }
 
 

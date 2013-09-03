@@ -79,6 +79,9 @@ case $host in
 	backend="mac"
 	os="darwin"
 	threads="pthreads"
+	CFLAGS="$CFLAGS -arch i386"
+	CXXFLAGS="$CXXFLAGS -arch i386"
+	LDFLAGS="$LDFLAGS -arch i386"
 	LIBS="${LIBS} -framework IOKit -framework CoreFoundation"
 	;;
 *-freebsd*)

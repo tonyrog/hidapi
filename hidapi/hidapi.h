@@ -44,6 +44,7 @@ extern "C" {
 #endif
 		struct hid_device_;
 		typedef struct hid_device_ hid_device; /**< opaque hidapi structure */
+		typedef void* hid_handle_t;
 
 		/** hidapi info structure */
 		struct hid_device_info {
@@ -173,6 +174,9 @@ extern "C" {
 				success or NULL on failure.
 		*/
 		HID_API_EXPORT hid_device * HID_API_CALL hid_open_path(const char *path);
+		/** @brief Get an event handle suitable for poll/select
+		*/
+		HID_API_EXPORT hid_handle_t HID_API_CALL hid_get_event_handle(hid_device *dev);
 
 		/** @brief Write an Output report to a HID device.
 
