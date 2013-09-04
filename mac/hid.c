@@ -761,6 +761,29 @@ return_error:
 	return NULL;
 }
 
+int HID_API_EXPORT hid_get_report_descriptor(hid_device *dev, unsigned char *data, size_t length)
+{
+    CFDataRef ref;
+    CFIndex ref_len;
+    const char* ptr;
+
+    ref = IOHIDDeviceGetProperty(dev->device_handle,
+				 CFSTR(kIOHIDReportDescriptorKey));
+    if (!ref) {
+	errno = EINVAL;
+	return -1;
+    }
+    ref_len = CFDataGetLength(ref);
+    if (ref_len > length) {
+	errno = ERANGE;
+	return -1;
+    }
+    ptr = CFDataGetBytePtr(ref);
+    memcpy(data, ptr, ref_len);
+    return ref_len;
+}
+
+
 static int set_report(hid_device *dev, IOHIDReportType type, const unsigned char *data, size_t length)
 {
 	const unsigned char *data_to_send;

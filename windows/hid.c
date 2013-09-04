@@ -543,7 +543,7 @@ HID_API_EXPORT hid_device * HID_API_CALL hid_open(unsigned short vendor_id, unsi
 	return handle;
 }
 
-HID_API_EXPORT hid_device * HID_API_CALL hid_open_path(const char *path)
+HID_API_EXPORT hid_device* HID_API_CALL hid_open_path(const char *path)
 {
 	hid_device *dev;
 	HIDP_CAPS caps;
@@ -591,6 +591,12 @@ err_pp_data:
 err:	
 		free_hid_device(dev);
 		return NULL;
+}
+
+int HID_API_EXPORT HID_API_CALL hid_get_report_descriptor(hid_device *dev, unsigned char *data, size_t length)
+{
+    // IOCTL_HID_GET_REPORT_DESCRIPTOR
+    return -1; // not implemented yet
 }
 
 int HID_API_EXPORT HID_API_CALL hid_write(hid_device *dev, const unsigned char *data, size_t length)
@@ -732,11 +738,10 @@ int HID_API_EXPORT HID_API_CALL hid_set_nonblocking(hid_device *dev, int nonbloc
 }
 
 // return an event handle that can be used for poll/epoll/select etc
-hid_handle_t HID_API_EXPORT hid_get_event_handle(hid_device *dev)
+hid_handle_t HID_API_EXPORT HID_API_CALL hid_get_event_handle(hid_device *dev)
 {
     return (hid_handle_t) dev->ol.hEvent;
 }
-
 
 int HID_API_EXPORT HID_API_CALL hid_send_feature_report(hid_device *dev, const unsigned char *data, size_t length)
 {

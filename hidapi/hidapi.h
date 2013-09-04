@@ -174,7 +174,18 @@ extern "C" {
 				success or NULL on failure.
 		*/
 		HID_API_EXPORT hid_device * HID_API_CALL hid_open_path(const char *path);
-		/** @brief Get an event handle suitable for poll/select
+
+		/** @brief Get an event handle suitable for poll/select/WaitForMultipleObject.
+
+			Get a handle that can be used in calls to poll/select/WaitForMultipleObject.
+			The call is then used together with hid_read_timeout with timeout normally set
+			to 0, in order to avoid blocking.
+
+			@ingroup API
+			@param device A device handle returned from hid_open().
+
+			@returns
+				This function returns aOS specific event handle.
 		*/
 		HID_API_EXPORT hid_handle_t HID_API_CALL hid_get_event_handle(hid_device *dev);
 
@@ -264,6 +275,27 @@ extern "C" {
 				This function returns 0 on success and -1 on error.
 		*/
 		int  HID_API_EXPORT HID_API_CALL hid_set_nonblocking(hid_device *device, int nonblock);
+
+		/** @brief Get the raw report descriptor for the HID device.
+
+			In non-blocking mode calls to hid_read() will return
+			immediately with a value of 0 if there is no data to be
+			read. In blocking mode, hid_read() will wait (block) until
+			there is data to read before returning.
+
+			@ingroup API
+			@param device A device handle returned from hid_open().
+			@param data The buffer where to place the descriptor data.
+			@param length The length of the buffer supplied.
+
+			@returns
+			      Returns -1 if the device is not open or if the data buffer
+			      is to small for the return descriptor. Otherwise the size of
+			      the raw report descriptor is returned.
+		*/
+
+		int HID_API_EXPORT HID_API_CALL hid_get_report_descriptor(hid_device *dev, unsigned char *data, size_t length);
+
 
 		/** @brief Send a Feature report to the device.
 

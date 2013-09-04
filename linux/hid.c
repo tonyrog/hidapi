@@ -655,6 +655,25 @@ hid_device * HID_API_EXPORT hid_open_path(const char *path)
 	}
 }
 
+int HID_API_EXPORT hid_get_report_descriptor(hid_device *dev, unsigned char *data, size_t length)
+{
+    int res;
+    struct hidraw_report_descriptor rpt_desc;
+    memset(&rpt_desc, 0x0, sizeof(rpt_desc));
+    /* Get Report Descriptor Size */
+    if (dev->device_handle > 0) {
+	if ((res = ioctl(dev->device_handle, HIDIOCGRDESCSIZE, &desc_size)) < 0)
+	    return res;
+	if (rpt_desc.size > length) {
+	    errno = ERANGE;
+	    return -1;
+	}
+	memcpy(data, rpt_desc.value, rpt_desc.size);
+	return rpt_desc.size;
+    }
+    errno = EINVAL;
+    return -1;
+}
 
 int HID_API_EXPORT hid_write(hid_device *dev, const unsigned char *data, size_t length)
 {
