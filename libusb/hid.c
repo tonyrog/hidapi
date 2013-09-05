@@ -76,9 +76,9 @@ instead to differentiate between interfaces on a composite HID device. */
 #define MAX_QUEUE_LEN 30
 /* Linked List of input reports received from the device. */
 struct input_report {
-	uint8_t *data;
-	size_t len;
 	struct input_report *next;
+	size_t len;
+	uint8_t data[1];
 };
 
 
@@ -122,6 +122,7 @@ static libusb_context *usb_context = NULL;
 
 uint16_t get_usb_code_for_current_locale(void);
 static int return_data(hid_device *dev, unsigned char *data, size_t length);
+static int drop_data(hid_device *dev);
 
 static hid_device *new_hid_device(void)
 {
@@ -670,11 +671,11 @@ static void read_callback(struct libusb_transfer *transfer)
 		pthread_mutex_lock(&dev->mutex);
 
 		*dev->last_input_report = rpt;
-		dev->last_input_report = &rpt;
+		dev->last_input_report = &(rpt->next);
 		dev->num_queued_reports++;
 
 		if (dev->num_queued_reports > MAX_QUEUE_LEN)
-		    return_data(dev, NULL, 0);
+		    drop_data(dev);
 		else {
 		    /* an client that poll on event handle may use this to poll for
 		     * new input data
@@ -993,22 +994,34 @@ static int return_data(hid_device *dev, unsigned char *data, size_t length)
 	/* Copy the data out of the linked list item (rpt) into the
 	   return buffer (data), and delete the liked list item. */
 	struct input_report *rpt = dev->input_reports;
-	size_t len = (length < rpt->len)? length: rpt->len;
-	if (len > 0)
-	    memcpy(data, rpt->data, len);
-	if (data && dev->num_queued_reports) {
+	if (rpt) {
+	    size_t len = (length < rpt->len)? length: rpt->len;
 	    char buf[1];
+	    
+	    memcpy(data, rpt->data, len);
 	    if (read(dev->ichan[0], buf, 1) < 1)  /* clear event */
 		LOG("read failed %s\n", strerror(errno));
 	    dev->num_queued_reports--;
+
+	    if ((dev->input_reports = rpt->next) == NULL) /* empty */
+		dev->last_input_report = &dev->input_reports;
+	    free(rpt);
+	    return len;
 	}
-	if ((dev->input_reports = rpt->next) == NULL) { /* empty */
-	    // assert(num_queued_reports == 0);
-	    dev->last_input_report = &dev->input_reports;
+	return 0;
+}
+
+static int drop_data(hid_device *dev)
+{
+	struct input_report *rpt = dev->input_reports;
+	if (rpt) {
+	    dev->num_queued_reports--;
+	    if ((dev->input_reports = rpt->next) == NULL) /* empty */
+		dev->last_input_report = &dev->input_reports;
+	    free(rpt);
+	    return 1;
 	}
-	free(rpt->data);
-	free(rpt);
-	return len;
+	return 0;
 }
 
 static void cleanup_mutex(void *param)
@@ -1208,7 +1221,7 @@ void HID_API_EXPORT hid_close(hid_device *dev)
 	/* Clear out the queue of received reports. */
 	pthread_mutex_lock(&dev->mutex);
 	while (dev->input_reports) {
-		return_data(dev, NULL, 0);
+		drop_data(dev);
 	}
 	pthread_mutex_unlock(&dev->mutex);
 

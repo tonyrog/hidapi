@@ -92,15 +92,15 @@ static int pthread_barrier_wait(pthread_barrier_t *barrier)
 }
 
 static int return_data(hid_device *dev, unsigned char *data, size_t length);
+static int drop_data(hid_device *dev);
 
 #define MAX_QUEUE_LEN 30
 
-/* FIXME: make array! */
 /* Linked List of input reports received from the device. */
 struct input_report {
-	uint8_t *data;
-	size_t len;
 	struct input_report *next;
+	size_t len;
+	uint8_t data[1];
 };
 
 struct hid_device_ {
@@ -163,7 +163,6 @@ static void free_hid_device(hid_device *dev)
 	struct input_report *rpt = dev->input_reports;
 	while (rpt) {
 		struct input_report *next = rpt->next;
-		free(rpt->data);
 		free(rpt);
 		rpt = next;
 	}
@@ -582,24 +581,27 @@ static void hid_report_callback(void *context, IOReturn result, void *sender,
 	hid_device *dev = context;
 
 	/* Make a new Input Report object */
-	rpt = calloc(1, sizeof(struct input_report));
-	rpt->data = calloc(1, report_length);
+	rpt = calloc(1, sizeof(struct input_report)+report_length);
 	memcpy(rpt->data, report, report_length);
 	rpt->len = report_length;
 	rpt->next = NULL;
+
+//	fprintf(stderr, "report: qlen=%d queue=%p report=%p size=%ld\r\n", 
+//		dev->num_queued_reports, dev->input_reports,
+//		report, report_length);
 
 	/* Lock this section */
 	pthread_mutex_lock(&dev->mutex);
 
 	*dev->last_input_report = rpt;
-	dev->last_input_report = &rpt;
+	dev->last_input_report = &(rpt->next);
 	dev->num_queued_reports++;
 
 	/* Pop one off if we've reached MAX_QUEUE_LEN in the queue. This
 	   way we don't grow forever if the user never reads
 	   anything from the device. */
 	if (dev->num_queued_reports > MAX_QUEUE_LEN)
-	    return_data(dev, NULL, 0);
+	    drop_data(dev);
 	else {
 	    /* A client that poll on event handle may use this to poll for
 	     * new input data
@@ -834,22 +836,35 @@ static int return_data(hid_device *dev, unsigned char *data, size_t length)
 	/* Copy the data out of the linked list item (rpt) into the
 	   return buffer (data), and delete the liked list item. */
 	struct input_report *rpt = dev->input_reports;
-	size_t len = (length < rpt->len)? length: rpt->len;
-	if (len > 0)
-	    memcpy(data, rpt->data, len);
-	if (data && dev->num_queued_reports) {
+	if (rpt) {
+	    size_t len = (length < rpt->len)? length : rpt->len;
 	    char buf[1];
+
+	    memcpy(data, rpt->data, len);
 	    read(dev->ichan[0], buf, 1);  /* clear event */
 	    dev->num_queued_reports--;
+
+	    if ((dev->input_reports = rpt->next) == NULL) /* empty */
+		dev->last_input_report = &dev->input_reports;
+	    free(rpt);
+	    return len;
 	}
-	if ((dev->input_reports = rpt->next) == NULL) { /* empty */
-	    // assert(num_queued_reports == 0);
-	    dev->last_input_report = &dev->input_reports;
-	}
-	free(rpt->data);
-	free(rpt);
-	return len;
+	return 0;
 }
+
+static int drop_data(hid_device *dev)
+{
+	struct input_report *rpt = dev->input_reports;
+	if (rpt) {
+	    dev->num_queued_reports--;
+	    if ((dev->input_reports = rpt->next) == NULL) /* empty */
+		dev->last_input_report = &dev->input_reports;
+	    free(rpt);
+	    return 1;
+	}
+	return 0;
+}
+
 
 static int cond_wait(const hid_device *dev, pthread_cond_t *cond, pthread_mutex_t *mutex)
 {
@@ -1050,7 +1065,7 @@ void HID_API_EXPORT hid_close(hid_device *dev)
 	/* Clear out the queue of received reports. */
 	pthread_mutex_lock(&dev->mutex);
 	while (dev->input_reports) {
-		return_data(dev, NULL, 0);
+		drop_data(dev);
 	}
 	pthread_mutex_unlock(&dev->mutex);
 	CFRelease(dev->device_handle);
