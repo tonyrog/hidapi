@@ -296,6 +296,13 @@ static int get_device_string(hid_device *dev, enum device_string_id key, wchar_t
 				}
 			}
 			else {
+				if (key == DEVICE_STRING_SERIAL) {	
+					/* work around */
+					retm = mbstowcs(string, serial_number_utf8, maxlen);
+					ret = (retm == (size_t)-1)? -1: 0;
+					goto end;
+				}
+			    
 				/* This is a USB device. Find its parent USB Device node. */
 				parent = udev_device_get_parent_with_subsystem_devtype(
 					   udev_dev,
