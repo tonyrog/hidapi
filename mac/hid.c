@@ -601,7 +601,7 @@ static void hid_report_callback(void *context, IOReturn result, void *sender,
 	if (dev->num_queued_reports > MAX_QUEUE_LEN)
 	    return_data(dev, NULL, 0);
 	else {
-	    /* an client that poll on event handle may use this to poll for
+	    /* A client that poll on event handle may use this to poll for
 	     * new input data
 	     */
 	    write(dev->ichan[1], "!", 1);
