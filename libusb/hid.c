@@ -53,6 +53,8 @@
 extern "C" {
 #endif
 
+// #define DEBUG_PRINTF
+
 #ifdef DEBUG_PRINTF
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #else
@@ -71,6 +73,7 @@ libusb HIDAPI programs are encouraged to use the interface number
 instead to differentiate between interfaces on a composite HID device. */
 /*#define INVASIVE_GET_USAGE*/
 
+#define MAX_QUEUE_LEN 30
 /* Linked List of input reports received from the device. */
 struct input_report {
 	uint8_t *data;
@@ -108,7 +111,11 @@ struct hid_device_ {
 	struct libusb_transfer *transfer;
 
 	/* List of received input reports. */
+	int num_queued_reports;
 	struct input_report *input_reports;
+        struct input_report **last_input_report;
+        int ichan[2];     /* thread write on 1 client poll on 0 */
+    
 };
 
 static libusb_context *usb_context = NULL;
@@ -120,10 +127,16 @@ static hid_device *new_hid_device(void)
 {
 	hid_device *dev = calloc(1, sizeof(hid_device));
 	dev->blocking = 1;
+	dev->last_input_report = &dev->input_reports;
+	dev->num_queued_reports = 0;
 
 	pthread_mutex_init(&dev->mutex, NULL);
 	pthread_cond_init(&dev->condition, NULL);
 	pthread_barrier_init(&dev->barrier, NULL, 2);
+
+	/* fixme check error */
+	if (pipe(dev->ichan) < 0)
+	    LOG("read failed %s\n", strerror(errno));
 
 	return dev;
 }
@@ -656,29 +669,21 @@ static void read_callback(struct libusb_transfer *transfer)
 
 		pthread_mutex_lock(&dev->mutex);
 
-		/* Attach the new report object to the end of the list. */
-		if (dev->input_reports == NULL) {
-			/* The list is empty. Put it at the root. */
-			dev->input_reports = rpt;
-			pthread_cond_signal(&dev->condition);
-		}
-		else {
-			/* Find the end of the list and attach. */
-			struct input_report *cur = dev->input_reports;
-			int num_queued = 0;
-			while (cur->next != NULL) {
-				cur = cur->next;
-				num_queued++;
-			}
-			cur->next = rpt;
+		*dev->last_input_report = rpt;
+		dev->last_input_report = &rpt;
+		dev->num_queued_reports++;
 
-			/* Pop one off if we've reached 30 in the queue. This
-			   way we don't grow forever if the user never reads
-			   anything from the device. */
-			if (num_queued > 30) {
-				return_data(dev, NULL, 0);
-			}
+		if (dev->num_queued_reports > MAX_QUEUE_LEN)
+		    return_data(dev, NULL, 0);
+		else {
+		    /* an client that poll on event handle may use this to poll for
+		     * new input data
+		     */
+		    if (write(dev->ichan[1], "!", 1) < 1)
+			LOG("read failed %s\n", strerror(errno));
 		}
+
+		pthread_cond_signal(&dev->condition);
 		pthread_mutex_unlock(&dev->mutex);
 	}
 	else if (transfer->status == LIBUSB_TRANSFER_CANCELLED) {
@@ -908,6 +913,28 @@ hid_device * HID_API_EXPORT hid_open_path(const char *path)
 	}
 }
 
+/* Get the HID Report Descriptor. */
+int HID_API_EXPORT hid_get_report_descriptor(hid_device *dev, unsigned char *data, size_t length)
+{
+    libusb_device_handle *handle;
+    unsigned char buf[4096];
+    int n;
+
+    handle = dev->device_handle;
+    n = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_RECIPIENT_INTERFACE,
+				LIBUSB_REQUEST_GET_DESCRIPTOR, (LIBUSB_DT_REPORT << 8)|dev->interface, 
+				0, buf, sizeof(buf), 5000);
+    if (n >= 0) {
+	if (n > length) {
+	    errno = ERANGE;
+	    return -1;
+	}
+	memcpy(data, buf, n);
+	return n;
+    }
+    return -1;
+}
+
 
 int HID_API_EXPORT hid_write(hid_device *dev, const unsigned char *data, size_t length)
 {
@@ -968,8 +995,17 @@ static int return_data(hid_device *dev, unsigned char *data, size_t length)
 	struct input_report *rpt = dev->input_reports;
 	size_t len = (length < rpt->len)? length: rpt->len;
 	if (len > 0)
-		memcpy(data, rpt->data, len);
-	dev->input_reports = rpt->next;
+	    memcpy(data, rpt->data, len);
+	if (data && dev->num_queued_reports) {
+	    char buf[1];
+	    if (read(dev->ichan[0], buf, 1) < 1)  /* clear event */
+		LOG("read failed %s\n", strerror(errno));
+	    dev->num_queued_reports--;
+	}
+	if ((dev->input_reports = rpt->next) == NULL) { /* empty */
+	    // assert(num_queued_reports == 0);
+	    dev->last_input_report = &dev->input_reports;
+	}
 	free(rpt->data);
 	free(rpt);
 	return len;
@@ -1077,6 +1113,12 @@ int HID_API_EXPORT hid_set_nonblocking(hid_device *dev, int nonblock)
 	dev->blocking = !nonblock;
 
 	return 0;
+}
+
+// return an event handle that can be used for poll/epoll/select etc
+hid_handle_t HID_API_EXPORT hid_get_event_handle(hid_device *dev)
+{
+    return (hid_handle_t) ((intptr_t)dev->ichan[0]);
 }
 
 
