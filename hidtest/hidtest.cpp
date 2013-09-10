@@ -590,9 +590,9 @@ int main(int argc, char* argv[])
 // 		printf("Unable to write() (2)\n");
 
 
-	for ( int i=0; i<8; i++ ){
-	  printf("bitmask test, %i, %i, %02hhx\n", i, BITMASK1(i), BITMASK1(i) );
-	}
+// 	for ( int i=0; i<8; i++ ){
+// 	  printf("bitmask test, %i, %i, %02hhx\n", i, BITMASK1(i), BITMASK1(i) );
+// 	}
 
 	// Read requested state. hid_read() has been set to be
 	// non-blocking by the call to hid_set_nonblocking() above.
