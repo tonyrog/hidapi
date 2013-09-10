@@ -31,7 +31,9 @@ if OS_WINDOWS
 SUBDIRS += windows
 endif
 
+SUBDIRS += hidapi_parser
 SUBDIRS += hidtest
+
 
 if BUILD_TESTGUI
 SUBDIRS += testgui
