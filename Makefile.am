@@ -31,7 +31,8 @@ if OS_WINDOWS
 SUBDIRS += windows
 endif
 
-SUBDIRS += hidapi_parser
+# SUBDIRS += hidapi_parser
+SUBDIRS += hidparsertest
 SUBDIRS += hidapi2osc
 SUBDIRS += hidtest
 

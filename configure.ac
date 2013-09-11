@@ -221,7 +221,7 @@ PKG_CHECK_MODULES( LIBLO, liblo)
 
 AC_CONFIG_FILES([Makefile \
 	hidtest/Makefile \
-	hidapi_parser/Makefile \
+	hidparsertest/Makefile \
 	hidapi2osc/Makefile \
 	libusb/Makefile \
 	linux/Makefile \
