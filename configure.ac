@@ -217,9 +217,12 @@ fi
 
 AC_SUBST(LTLDFLAGS)
 
+PKG_CHECK_MODULES( LIBLO, liblo)
+
 AC_CONFIG_FILES([Makefile \
 	hidtest/Makefile \
 	hidapi_parser/Makefile \
+	hidapi2osc/Makefile \
 	libusb/Makefile \
 	linux/Makefile \
 	mac/Makefile \

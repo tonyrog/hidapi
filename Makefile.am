@@ -32,6 +32,7 @@ SUBDIRS += windows
 endif
 
 SUBDIRS += hidapi_parser
+SUBDIRS += hidapi2osc
 SUBDIRS += hidtest
 
 
