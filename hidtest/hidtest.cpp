@@ -14,6 +14,8 @@
  which use HIDAPI.
 ********************************************************/
 
+//TODO: add copyright notice
+
 #include <stdio.h>
 #include <wchar.h>
 #include <string.h>
