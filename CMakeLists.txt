@@ -18,7 +18,7 @@ option(EXAMPLE_OSC "build osc example" ON)
 
 
 # add our own cmake-modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules/")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake_modules/")
 
 if( DEBUG_PARSER )
   add_definitions( -DDEBUG_PARSER )
