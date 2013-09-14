@@ -1,0 +1,1 @@
+message( "hidapi cmakelists" )

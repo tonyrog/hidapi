@@ -1,3 +1,34 @@
+         HIDAPI + parser library for Windows, Linux, FreeBSD and Mac OS X
+        =========================================================
+This version [1] is an extension of the original HIDAPI library, based on Tony Roggs fork [2],
+which reads the report descriptor of the device.
+
+The main addition is a parser which parses the retrieved report descriptor, populates a struct
+with the element descriptors, and finally provides a data parsing function based on this. 
+
+In addition, a CMake build system has been made.
+
+Some test examples are available:
+* hidparsertest will list all devices and optionally open one, displaying the element information, and the incoming data
+* hidapi2osc will send out the data via OSC (OpenSoundControl), and provides an OSC interface for listing, opening and closing devices (see the supercollider script for testing the interface)
+
+[1] https://github.com/sensestage/hidapi
+[2] https://github.com/tonyrog/hidapi
+
+TODO:
+- creating + sending output reports
+- creating + sending/reading + parsing feature reports
+- reading windows report descriptor
+- cmake lists for OSX, Windows and FreeBSD
+
+
+ Copyright (C) 2013, Marije Baalman <nescivi _at_ gmail.com>
+ This work was funded by a crowd-funding initiative for SuperCollider's [1] HID implementation
+ including a substantial donation from BEK, Bergen Center for Electronic Arts, Norway
+  
+ [1] http://supercollider.sourceforge.net
+ [2] http://www.bek.no
+
          HIDAPI library for Windows, Linux, FreeBSD and Mac OS X
         =========================================================
 
@@ -154,7 +185,7 @@ Prerequisites:
 
 	If you downloaded the source directly from the git repository (using
 	git clone), you'll need Autotools:
-	    sudo apt-get install autotools-dev
+	    sudo apt-get install autotools-dev autoconf automake libtool
 
 	FreeBSD:
 	---------
