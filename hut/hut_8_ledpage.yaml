@@ -1,0 +1,6 @@
+---
+# LED page
+# page:	0x08
+# 0x01:
+#   name: Keyboard_ErrorRollOver
+#   type: Sel
