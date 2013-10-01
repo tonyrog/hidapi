@@ -1,6 +1,8 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 if OS_FREEBSD
 pkgconfigdir=$(prefix)/libdata/pkgconfig
 else
