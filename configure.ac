@@ -217,12 +217,23 @@ fi
 
 AC_SUBST(LTLDFLAGS)
 
-PKG_CHECK_MODULES( LIBLO, liblo)
+# Test OSC
+AC_ARG_ENABLE([testosc],
+	[AS_HELP_STRING([--enable-testosc],
+		[enable building of test OSC (default n)])],
+	[testosc_enabled=$enableval],
+	[testosc_enabled='no'])
+AM_CONDITIONAL([BUILD_TESTOSC], [test "x$testosc_enabled" != "xno"])
 
+# make osc example program optional
+if test "x$testosc_enabled" != "xno"; then
+  PKG_CHECK_MODULES( LIBLO, liblo)
+  AC_CONFIG_FILES([hidapi2osc/Makefile])
+fi
+  
 AC_CONFIG_FILES([Makefile \
 	hidtest/Makefile \
 	hidparsertest/Makefile \
-	hidapi2osc/Makefile \
 	libusb/Makefile \
 	linux/Makefile \
 	mac/Makefile \
