@@ -10,7 +10,8 @@ In addition, a CMake build system has been made.
 
 Some test examples are available:
 * hidparsertest will list all devices and optionally open one, displaying the element information, and the incoming data
-* hidapi2osc will send out the data via OSC (OpenSoundControl), and provides an OSC interface for listing, opening and closing devices (see the supercollider script for testing the interface)
+* hidapi2osc will send out the data via OSC (OpenSoundControl), and provides an OSC interface for listing, opening and closing devices (see the supercollider script for testing the interface), to enable building this, use the CMake build system, or pass the --enable-testosc flag to the configure script:
+$ ./configure --enable-testosc
 
 [1] https://github.com/sensestage/hidapi
 [2] https://github.com/tonyrog/hidapi

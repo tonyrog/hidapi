@@ -1,0 +1,6 @@
+---
+# Telephony
+# page:	0x0B
+# 0x01:
+#   name: Keyboard_ErrorRollOver
+#   type: Sel

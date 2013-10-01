@@ -33,12 +33,15 @@ endif
 
 # SUBDIRS += hidapi_parser
 SUBDIRS += hidparsertest
-SUBDIRS += hidapi2osc
 SUBDIRS += hidtest
 
 
 if BUILD_TESTGUI
 SUBDIRS += testgui
+endif
+
+if BUILD_TESTOSC
+SUBDIRS += hidapi2osc
 endif
 
 EXTRA_DIST = udev doxygen
