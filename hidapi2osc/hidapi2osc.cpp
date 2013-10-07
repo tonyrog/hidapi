@@ -75,11 +75,11 @@ static void osc_element_cb( struct hid_device_element *el, void *data)
   lo_message_free(m1);
 }
 
-static void osc_descriptor_cb( struct hid_device_descriptor *dd, void *data)
+static void osc_descriptor_cb( struct hid_dev_desc *dd, void *data)
 {
   lo_message m1 = lo_message_new();
   lo_message_add_int32( m1, *((int*) data) );
-  lo_message_add_int32( m1, dd->num_elements );
+  lo_message_add_int32( m1, dd->device_collection->num_elements );
   lo_send_message_from( t, s, "/hid/device/data", m1 );
   lo_message_free(m1);
 }
@@ -115,8 +115,8 @@ void open_device( unsigned short vendor, unsigned short product, const wchar_t *
     
     newdevdesc->index = number_of_hids;
     
-    hid_set_descriptor_callback( newdevdesc->descriptor, (hid_descriptor_callback) osc_descriptor_cb, &newdevdesc->index );
-    hid_set_element_callback( newdevdesc->descriptor, (hid_element_callback) osc_element_cb, &newdevdesc->index );  
+    hid_set_descriptor_callback( newdevdesc, (hid_descriptor_callback) osc_descriptor_cb, &newdevdesc->index );
+    hid_set_element_callback( newdevdesc, (hid_element_callback) osc_element_cb, &newdevdesc->index );  
 
     number_of_hids++;
   }
@@ -132,6 +132,29 @@ void close_device( int joy_idx ){
     hid_close_device( hidtoclose );
     hiddevices.erase( joy_idx );
   }
+}
+
+
+void send_output_to_hid( int joy_idx, int reportid ){ 
+  struct hid_dev_desc * hidtosendoutput = hiddevices.find( joy_idx )->second;
+  hid_send_output_report( hidtosendoutput, reportid );
+}
+
+void set_element_output( int joy_idx, int elementid, int value ){ 
+  struct hid_dev_desc * devd = hiddevices.find( joy_idx )->second;
+  
+  if ( devd != NULL ){
+    // find the right output element
+    struct hid_device_collection * device_collection = devd->device_collection;
+    struct hid_device_element * cur_element = device_collection->first_element;
+    
+    while ( (cur_element->io_type != 2 || (cur_element->index != elementid)) && cur_element != NULL ){
+	cur_element = hid_get_next_output_element(cur_element);
+    }
+    if ( cur_element != NULL ){
+	cur_element->value = value;
+    }
+  }  
 }
 
 
@@ -154,6 +177,13 @@ int hid_info_handler(const char *path, const char *types, lo_arg **argv,
 int hid_element_info_handler(const char *path, const char *types, lo_arg **argv,
 			 int argc, void *data, void *user_data);
 
+int hid_element_output_handler(const char *path, const char *types, lo_arg **argv,
+			 int argc, void *data, void *user_data);
+
+int hid_output_handler(const char *path, const char *types, lo_arg **argv,
+			 int argc, void *data, void *user_data);
+
+
 int generic_handler(const char *path, const char *types, lo_arg **argv,
 		    int argc, void *data, void *user_data);
 int quit_handler(const char *path, const char *types, lo_arg **argv, int argc,
@@ -169,6 +199,9 @@ int init_osc( char * ip, char *outport, char * port ){
     lo_server_thread_add_method(st, "/hid/element/info", "i", hid_element_info_handler, NULL);
     lo_server_thread_add_method(st, "/hid/info", "i", hid_info_handler, NULL);
     lo_server_thread_add_method(st, "/hid/close", "i", hid_close_handler, NULL);
+
+    lo_server_thread_add_method(st, "/hid/element/output", "iii", hid_element_output_handler, NULL);
+    lo_server_thread_add_method(st, "/hid/output", "ii", hid_output_handler, NULL);
 
     lo_server_thread_add_method(st, "/hidapi2osc/info", "", info_handler, NULL);
     lo_server_thread_add_method(st, "/hidapi2osc/quit", "", quit_handler, NULL);
@@ -334,10 +367,10 @@ void send_elements_hid_info(int joy_idx)
 
   lo_message m1 = lo_message_new();
   lo_message_add_int32( m1, joy_idx );
-  lo_message_add_int32( m1, hid->descriptor->num_elements );
+  lo_message_add_int32( m1, hid->device_collection->num_elements );
   lo_bundle_add_message( b, "/hid/element/number", m1 );
 
-  hid_device_element * cur_element = hid->descriptor->first;
+  hid_device_element * cur_element = hid->device_collection->first_element;
   
   while (cur_element) {
     lo_message m2 = get_hid_element_info_msg( cur_element, joy_idx );
@@ -378,6 +411,22 @@ int hid_element_info_handler(const char *path, const char *types, lo_arg **argv,
   printf("hidapi2osc: joystick elements info handler\n");
 
   send_elements_hid_info( argv[0]->i );
+  return 0;
+}
+
+int hid_element_output_handler(const char *path, const char *types, lo_arg **argv, int argc,
+		 void *data, void *user_data)
+{
+  printf("hidapi2osc: joystick elements output handler\n");
+  set_element_output( argv[0]->i, argv[1]->i, argv[2]->i );
+  return 0;
+}
+
+int hid_output_handler(const char *path, const char *types, lo_arg **argv, int argc,
+		 void *data, void *user_data)
+{
+  printf("hidapi2osc: joystick output handler\n");
+  send_output_to_hid( argv[0]->i, argv[1]->i );
   return 0;
 }
 
@@ -570,7 +619,7 @@ int main(int argc, char** argv)
 	for(it=hiddevices.begin(); it!=hiddevices.end(); ++it){
 	  res = hid_read( it->second->device, buf, sizeof(buf));
 	  if ( res > 0 ) {
-	    hid_parse_input_report( buf, res, it->second->descriptor );
+	    hid_parse_input_report( buf, res, it->second );
 	  }
 	}
 	#ifdef WIN32
