@@ -24,6 +24,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <memory.h>
 // #include <math.h>
 
 #include "hidapi_parser.h"
@@ -612,7 +613,7 @@ int hid_parse_report_descriptor( char* descr_buf, int size, struct hid_dev_desc 
 #ifdef DEBUG_PARSER
 	    printf("\tsetting next byte type: %i, 0x%02hhx ", descr_buf[i], descr_buf[i] );
 #endif
-	    if ( descr_buf[i] == HID_END_COLLECTION ){ // JUST one byte
+	    if ( descr_buf[i] == (char)HID_END_COLLECTION ){ // JUST one byte
 // 	      prev_collection = parent_collection;
 	      current_usage_page = parent_collection->usage_page;
 	      current_usage_index = parent_collection->usage_index;
