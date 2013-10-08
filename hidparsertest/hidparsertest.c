@@ -87,7 +87,7 @@ void print_collection_info( struct hid_device_collection *collection ){
   printf( "number of collections in collection: %i\n", collection->num_collections );
   for ( i=0; i<collection->num_collections; i++ ){
     if ( cur_collection != NULL ){
-      printf("cur_collection %i\n", cur_collection );
+      printf("cur_collection %p\n", cur_collection );
       print_collection_info( cur_collection );
       cur_collection = cur_collection->next_collection;
     }
@@ -99,7 +99,7 @@ void print_collection_info( struct hid_device_collection *collection ){
   printf( "number of elements in collection: %i\n", collection->num_elements );
   for ( i=0; i<collection->num_elements; i++ ){
     if ( cur_element != NULL ){
-      printf("cur_element %i\n", cur_element );
+      printf("cur_element %p\n", cur_element );
       print_element_info( cur_element );
       cur_element = cur_element->next;
     }
@@ -228,7 +228,7 @@ int main(int argc, char* argv[]){
   
   printf( "number of elements in device: %i\n", devdesc->device_collection->num_elements );
   while (cur_element != NULL ) {
-    printf("cur_element %i\n", cur_element );
+    printf("cur_element %p\n", cur_element );
     print_element_info( cur_element );
 //     printf("press key to continue\n" );
 //     getchar();
